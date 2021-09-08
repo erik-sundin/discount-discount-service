@@ -2,16 +2,16 @@
 import sqlalchemy
 import uuid
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.future import select
 from sqlalchemy import Column
 from sqlalchemy import String
 from sqlalchemy import Integer
+from sqlalchemy import Boolean
 from sqlalchemy.sql.schema import ForeignKey
-from sqlalchemy.sql.sqltypes import Boolean
 from sqlalchemy.dialects.postgresql import UUID
 
 
 Base = declarative_base()
+
 
 class Discount(Base):
     """
@@ -23,10 +23,11 @@ class Discount(Base):
     customer = Column(String)
     name = Column(String)
     percentage = Column(Integer)
-    codes = sqlalchemy.orm.relationship("DiscountCode", back_populates='discount')
+    codes = sqlalchemy.orm.relationship(
+        "DiscountCode", back_populates='discount')
 
     def __init__(self, customer: str, name: str, percentage: int, n_codes: int) -> None:
-        if percentage not in range(0,101):
+        if percentage not in range(0, 101):
             raise ValueError("Invalid percentage.")
         self.customer = customer
         self.name = name
@@ -36,7 +37,6 @@ class Discount(Base):
     @property
     def unclaimed_codes(self) -> list:
         return [code for code in self.codes if not code.claimed]
-        
 
 
 class DiscountCode(Base):
@@ -51,8 +51,5 @@ class DiscountCode(Base):
     user = Column(String)
     claimed = Column(Boolean)
 
-
     def __init__(self, discount: Discount) -> None:
         self.discount = discount
-
-

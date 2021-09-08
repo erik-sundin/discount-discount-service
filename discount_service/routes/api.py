@@ -10,7 +10,6 @@ from ..db import Discount
 from ..config import Config
 
 
-
 class Discounts:
 
     def __init__(self, config: Config, db_session: sessionmaker):
@@ -25,12 +24,12 @@ class Discounts:
                     result = await session.execute(
                         select(Discount).options(joinedload(Discount.codes))
                     )
-                    discounts = result.unique().scalars().all()
-        except Exception as db_error:
+                    discounts = result.unique().scalars()
+        except SQLAlchemyError as db_error:
             self._logger.error(db_error)
             raise falcon.HTTPInternalServerError(
                 title="Database Access Error", description=db_error.__repr__())
-        resp.text = json.dumps({
+        resp.media = {
             'availableDiscounts':  [
                 {
                     "id": discount.id,
@@ -38,27 +37,28 @@ class Discounts:
                     "brand": discount.customer,
                     "percentage": discount.percentage,
                     "available": len([code for code in discount.codes if not code.claimed])
-                    } for discount in discounts if len(discount.unclaimed_codes) > 0]})
+                } for discount in discounts if len(discount.unclaimed_codes) > 0]}
 
     @jsonschema.validate(req_schema={
-            "type": "object",
-            "properties": {
+        "type": "object",
+        "properties": {
                 "name": {"type": "string"},
                 "percentage": {"type": "integer", "minimum": 0, "maximum": 100},
                 "nCodes": {"type": "integer", "minimum": 1}
-            },
-            "minProperties": 3,
-            "additionalProperties": False
-        })
+        },
+        "minProperties": 3,
+        "additionalProperties": False
+    })
     async def on_post_create(self, req: falcon.asgi.Request, resp: falcon.asgi.Response) -> None:
-        req_json: dict = await req.get_media() # type: ignore
+        req_json: dict = await req.get_media()  # type: ignore
         try:
-            new_discount = Discount("testdata", req_json['name'], req_json["percentage"], req_json["nCodes"])
+            new_discount = Discount(
+                "testdata", req_json['name'], req_json["percentage"], req_json["nCodes"])
             async with self._db_session() as session:
                 async with session.begin():
                     session.add(new_discount)
                 await session.commit()
-        except Exception as db_error:
+        except SQLAlchemyError as db_error:
             self._logger.error(db_error)
             raise falcon.HTTPInternalServerError(
                 title="Database Access Error", description=db_error.__repr__())
@@ -71,7 +71,7 @@ class Discounts:
         "minProperties": 1,
         "additionalProperties": False
     })
-    async def on_post_claim(self, req, resp, id: str) -> None:
+    async def on_post_claim(self, req: falcon.asgi.Request, resp: falcon.asgi.Response, id: str) -> None:
         try:
             id = int(id)
         except ValueError:
@@ -81,11 +81,12 @@ class Discounts:
             async with self._db_session() as session:
                 async with session.begin():
                     result = await session.execute(
-                        select(Discount).where(Discount.id == id).options(selectinload(Discount.codes))
+                        select(Discount).where(Discount.id == id).options(
+                            selectinload(Discount.codes))
                     )
                     discount = result.scalar()
                     if not discount or len(discount.unclaimed_codes) < 1:
-                        resp.text = json.dumps({"registered": False, "code": None, "reason": "No codes available"})
+                        resp.media = {"registered": False, "code": None, "reason": "No codes available"}
                         return
                     user_code = discount.unclaimed_codes[0]
                     user_code.claimed = True
@@ -95,11 +96,11 @@ class Discounts:
                         await session.commit()
                     except SQLAlchemyError as write_error:
                         await session.rollback()
-                        resp.text = json.dumps({"registered": False, "code": None, "reason": "No codes available"})
-                        return                       
+                        resp.media = {"registered": False, "code": None, "reason": "No codes available"}
+                        return
         except SQLAlchemyError as db_error:
             self._logger.error(db_error)
             raise falcon.HTTPInternalServerError(
                 title="Database Access Error", description=db_error.__repr__())
         # Notify brand of claimed discount here in some sane way.
-        resp.text = json.dumps({"registered": True, "code": str(user_discount_code)})
+        resp.media = {"registered": True, "code": str(user_discount_code)}
