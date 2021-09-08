@@ -1,0 +1,8 @@
+falcon
+sqlalchemy
+uvicorn
+asyncpg
+psycopg2-binary
+pytest
+pytest-async-sqlalchemy
+jsonschema

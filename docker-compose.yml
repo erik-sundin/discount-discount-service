@@ -1,0 +1,15 @@
+version: "3.9"
+services:
+  asgi:
+    build: .
+    volumes: 
+      - .:/discount_service
+    environment:
+      DB_URL: "postgresql+asyncpg://postgres:verysecret@postgres:5432"
+    ports: 
+      - 8000:8000
+  postgres:
+    image: "postgres:alpine"
+    hostname: "postgres"
+    environment:
+      POSTGRES_PASSWORD: "verysecret"
