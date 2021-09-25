@@ -4,5 +4,7 @@ uvicorn
 asyncpg
 psycopg2-binary
 pytest
+pytest-asyncio
 pytest-async-sqlalchemy
 jsonschema
+falcon-jwt-guard
